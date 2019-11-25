@@ -1,0 +1,16 @@
+dist: centos
+env:
+  global:
+    - GO111MODULE=on
+    - REGISTRY_USER=${REGISTRY_USER}
+    - REGISTRY_PASS=${REGISTRY_PASS}
+    - secure: "${REGISTRY_SECURE}"
+  matrix:
+    #- TARGET=amd64
+    - TARGET=arm
+
+before_install:
+  - echo "Hello Lenny"
+
+script:
+  - GOARCH="${TARGET}" prepare_image.sh
