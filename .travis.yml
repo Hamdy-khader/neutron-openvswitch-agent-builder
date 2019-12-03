@@ -1,16 +1,74 @@
-dist: centos
+language: python
+python: 2.7
+sudo: required
+dist: bionic
+arch: arm64
 env:
   global:
-    - GO111MODULE=on
-    - REGISTRY_USER=${REGISTRY_USER}
-    - REGISTRY_PASS=${REGISTRY_PASS}
-    - secure: "${REGISTRY_SECURE}"
-  matrix:
-    #- TARGET=amd64
-    - TARGET=arm
+    - ARCH=${TRAVIS_ARCH}
+    - TAG=0.0.1
+    - DISTRO=centos
+    - VERSION=7
+    #- REGISTRY_USER=lennyb
+    #- REGISTRY_PASS=123456
+    - DOCKERHUBUSER=${DOCKERHUBUSER}
+    - DOCKERHUBPSW=${DOCKERHUBPSW}
+
+  #jobs:
+  #  - secure: hello
+
+services:
+  - docker
 
 before_install:
-  - echo "Hello Lenny"
+  - sudo docker pull arm64v8/${DISTRO}:${VERSION}
+
+before_deploy:
+  - docker login -u "$DOCKERHUBUSER" -p "$DOCKERHUBPSW"
+
+#install:
+#  - echo "Install phase"
 
 script:
-  - GOARCH="${TARGET}" prepare_image.sh
+  # Run container in detached state
+  - echo "************************************************"
+  - env
+  - echo "************************************************"
+  - sudo docker run -di --name ovs_agent_docker -v $(pwd):/neutron-openvswitch-agent-builder -v /var/run/docker.sock:/var/run/docker.sock arm64v8/${DISTRO}:${VERSION} /usr/sbin/init
+  - sudo docker exec -i ovs_agent_docker uname -a
+  - sudo docker exec -i ovs_agent_docker cat /etc/redhat-release
+
+# Install prereqs
+  - sudo docker exec -i ovs_agent_docker bash -cx 'curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py; python2 ./get-pip.py'
+  - sudo docker exec -i ovs_agent_docker bash -cx 'pip install setuptools tox pbr jinja2'
+  - sudo docker exec -i ovs_agent_docker bash -cx "yum install -y git"
+
+# Install Kolla
+  - git clone https://github.com/openstack/tripleo-repos $(pwd)/tripleo-repos
+  - sudo docker exec -i ovs_agent_docker bash -cx 'cd /neutron-openvswitch-agent-builder/tripleo-repos; python2 ./setup.py install'
+
+  - git clone https://github.com/openstack/kolla $(pwd)/kolla
+  - sudo docker exec -i ovs_agent_docker bash -cx 'cd /neutron-openvswitch-agent-builder/kolla; pip install -r requirements.txt; python2 ./setup.py install'
+
+# Create Docker
+  #- sudo docker exec -i ovs_agent_docker kolla-build --base centos --base-arch aarch64 neutron-openvswitch-agent
+  - sudo docker exec -i ovs_agent_docker kolla-build --base ${DISTRO} --base-arch ${ARCH} neutron-openvswitch-agent 
+
+# Save docker
+  - sudo docker save kolla/${DISTRO}-binary-neutron-openvswitch-agent > /tmp/centos-binary-neutron-openvswitch-agent.tar
+  - ls -l /tmp/centos-binary-neutron-openvswitch-agent.tar
+
+# Upload docker
+  - docker_uuid=$(docker images|grep binary-neutron-openvswitch-agent|awk '{print $3}')
+  - docker_version=$(docker images|grep binary-neutron-openvswitch-agent|awk '{print $2}')
+
+  - docker tag $docker_uuid mellanox/centos-binary-neutron-openvswitch-agent-${ARCH}:$docker_version
+  - docker images
+  - echo "docker push mellanox/centos-binary-neutron-openvswitch-agent-${ARCH}"
+  - cat ~/.docker/config.json
+  - docker info
+  - docker push mellanox/centos-binary-neutron-openvswitch-agent-${ARCH}
+
+ # Clean up
+  - sudo docker stop ovs_agent_docker
+
