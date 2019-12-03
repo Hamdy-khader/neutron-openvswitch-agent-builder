@@ -6,14 +6,11 @@ arch: arm64
 env:
   global:
     - ARCH=${TRAVIS_ARCH}
-    - TAG=0.0.1
-    - DISTRO=centos
-    - VERSION=7
+    - TAG=${TAG:-latest}
+    - DISTRO=${DISTRO:-centos}
+    - VERSION=${VERSION:7}
     - DOCKERHUBUSER=${DOCKERHUBUSER}
     - DOCKERHUBPSW=${DOCKERHUBPSW}
-
-  #jobs:
-  #  - secure: hello
 
 services:
   - docker
@@ -21,18 +18,9 @@ services:
 before_install:
   - sudo docker pull arm64v8/${DISTRO}:${VERSION}
 
-before_deploy:
-  - docker login -u "$DOCKERHUBUSER" -p "$DOCKERHUBPSW"
-
-#install:
-#  - echo "Install phase"
-
 script:
   # Run container in detached state
-  - echo "************************************************"
   - env
-  - echo "************************************************"
-  - echo "docker login -u $DOCKERHUBUSER -p $DOCKERHUBPSW"
   - docker login -u "$DOCKERHUBUSER" -p "$DOCKERHUBPSW"
   - sudo docker run -di --name ovs_agent_docker -v $(pwd):/neutron-openvswitch-agent-builder -v /var/run/docker.sock:/var/run/docker.sock arm64v8/${DISTRO}:${VERSION} /usr/sbin/init
   - sudo docker exec -i ovs_agent_docker uname -a
@@ -51,24 +39,12 @@ script:
   - sudo docker exec -i ovs_agent_docker bash -cx 'cd /neutron-openvswitch-agent-builder/kolla; pip install -r requirements.txt; python2 ./setup.py install'
 
 # Create Docker
-  #- sudo docker exec -i ovs_agent_docker kolla-build --base centos --base-arch aarch64 neutron-openvswitch-agent
-  - sudo docker exec -i ovs_agent_docker kolla-build --base ${DISTRO} --base-arch ${ARCH} neutron-openvswitch-agent 
-
-# Save docker
-  - sudo docker save kolla/${DISTRO}-binary-neutron-openvswitch-agent > /tmp/centos-binary-neutron-openvswitch-agent.tar
-  - ls -l /tmp/centos-binary-neutron-openvswitch-agent.tar
+  - sudo docker exec -i ovs_agent_docker kolla-build --base ${DISTRO} --base-arch ${ARCH} neutron-openvswitch-agent
 
 # Upload docker
   - docker_uuid=$(docker images|grep binary-neutron-openvswitch-agent|awk '{print $3}')
   - docker_version=$(docker images|grep binary-neutron-openvswitch-agent|awk '{print $2}')
 
-  - docker tag $docker_uuid mellanox/centos-binary-neutron-openvswitch-agent-${ARCH}:$docker_version
+  - docker tag $docker_uuid mellanox/${DISTRO}-binary-neutron-openvswitch-agent-${ARCH}:$docker_version
   - docker images
-  - echo "docker push mellanox/centos-binary-neutron-openvswitch-agent-${ARCH}"
-  - cat ~/.docker/config.json
-  - docker info
-  - docker push mellanox/centos-binary-neutron-openvswitch-agent-${ARCH}
-
- # Clean up
-  - sudo docker stop ovs_agent_docker
-
+  - docker push mellanox/${DISTRO}-binary-neutron-openvswitch-agent-${ARCH}
