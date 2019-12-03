@@ -7,8 +7,8 @@ env:
   global:
     - ARCH=${TRAVIS_ARCH}
     - TAG=${TAG:-latest}
-    - DISTRO=${DISTRO:-centos}
-    - VERSION=${VERSION:7}
+    - DISTRO=centos
+    - VERSION=7
 
 services:
   - docker
@@ -16,9 +16,9 @@ services:
 script:
   # Run container in detached state
   - env
-  - sudo docker pull arm64v8/${DISTRO}:${VERSION}
+  - sudo docker pull arm64v8/centos:7
   - docker login -u "$DOCKERHUBUSER" -p "$DOCKERHUBPSW"
-  - sudo docker run -di --name ovs_agent_docker -v $(pwd):/neutron-openvswitch-agent-builder -v /var/run/docker.sock:/var/run/docker.sock arm64v8/${DISTRO}:${VERSION} /usr/sbin/init
+  - sudo docker run -di --name ovs_agent_docker -v $(pwd):/neutron-openvswitch-agent-builder -v /var/run/docker.sock:/var/run/docker.sock arm64v8/centos:7 /usr/sbin/init
   - sudo docker exec -i ovs_agent_docker uname -a
   - sudo docker exec -i ovs_agent_docker cat /etc/redhat-release
 
