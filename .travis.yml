@@ -34,6 +34,9 @@ script:
   - git clone https://github.com/openstack/kolla $(pwd)/kolla
   - sudo docker exec -i ovs_agent_docker bash -cx 'cd /neutron-openvswitch-agent-builder/kolla; pip install -r requirements.txt; python2 ./setup.py install'
 
+# Install repos
+  - sudo docker exec -i ovs_agent_docker tripleo-repos -d ${DISTRO}${VERSION} -b train current
+
 # Create Docker
   - sudo docker exec -i ovs_agent_docker kolla-build --base ${DISTRO} --base-arch ${ARCH} neutron-openvswitch-agent
 
